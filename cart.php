@@ -1,92 +1,92 @@
-<?php
-session_start();
-// Подключение к базе данных откладываем до использования
-$user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+    <?php
+    session_start();
+    // Подключение к базе данных откладываем до использования
+    $user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
 
-// Проверка авторизации
-if (!$user_id) {
-    header("Location: login.php");
-    exit();
-}
+    // Проверка авторизации
+    if (!$user_id) {
+        header("Location: login.php");
+        exit();
+    }
 
-// Логика добавления, удаления и оформления заказа
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    include 'includes/db.php'; // Подключаем базу данных только при необходимости
+    // Логика добавления, удаления и оформления заказа
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+        include 'includes/db.php'; // Подключаем базу данных только при необходимости
 
-    if (isset($_POST['add']) && isset($_POST['product_id'])) {
-        $product_id = (int)$_POST['product_id'];
-        $quantity = (int)($_POST['quantity'] ?? 1);
+        if (isset($_POST['add']) && isset($_POST['product_id'])) {
+            $product_id = (int)$_POST['product_id'];
+            $quantity = (int)($_POST['quantity'] ?? 1);
 
-        // Проверка наличия товара в корзине
-        $stmt = $conn->prepare("SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?");
-        $stmt->bind_param("ii", $user_id, $product_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $cart_item = $result->fetch_assoc();
-
-        if ($cart_item) {
-            $new_quantity = $cart_item['quantity'] + $quantity;
-            $stmt = $conn->prepare("UPDATE cart SET quantity = ? WHERE id = ?");
-            $stmt->bind_param("ii", $new_quantity, $cart_item['id']);
-        } else {
-            $stmt = $conn->prepare("SELECT price FROM products WHERE id = ?");
-            $stmt->bind_param("i", $product_id);
+            // Проверка наличия товара в корзине
+            $stmt = $conn->prepare("SELECT id, quantity FROM cart WHERE user_id = ? AND product_id = ?");
+            $stmt->bind_param("ii", $user_id, $product_id);
             $stmt->execute();
-            $product = $stmt->get_result()->fetch_assoc();
-            if ($product) {
-                $price = $product['price'];
-                $stmt = $conn->prepare("INSERT INTO cart (user_id, product_id, price, quantity) VALUES (?, ?, ?, ?)");
-                $stmt->bind_param("iidi", $user_id, $product_id, $price, $quantity);
-            }
-        }
-        $stmt->execute();
-        header("Location: cart.php");
-        exit();
-    }
+            $result = $stmt->get_result();
+            $cart_item = $result->fetch_assoc();
 
-    if (isset($_POST['remove']) && isset($_POST['id'])) {
-        $cart_id = (int)$_POST['id'];
-        $stmt = $conn->prepare("DELETE FROM cart WHERE id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $cart_id, $user_id);
-        $stmt->execute();
-        header("Location: cart.php");
-        exit();
-    }
-
-    if (isset($_POST['place_order'])) {
-        $fio = htmlspecialchars(trim($_POST['fio']));
-        $email = htmlspecialchars(trim($_POST['email']));
-        $card_number = htmlspecialchars(trim($_POST['card_number']));
-
-        // Подсчёт общей суммы
-        $stmt = $conn->prepare("SELECT product_id, price, quantity FROM cart WHERE user_id = ?");
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
-        $cart_items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $total = 0;
-        foreach ($cart_items as $item) {
-            $total += $item['price'] * $item['quantity'];
-        }
-
-        // Сохранение заказа
-        $stmt = $conn->prepare("INSERT INTO orders (user_id, fio, email, card_number, total, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        if ($stmt) {
-            $stmt->bind_param("issdd", $user_id, $fio, $email, $card_number, $total);
-            if ($stmt->execute()) {
-                $stmt = $conn->prepare("DELETE FROM cart WHERE user_id = ?");
-                $stmt->bind_param("i", $user_id);
-                $stmt->execute();
-                header("Location: cart.php?order=success");
+            if ($cart_item) {
+                $new_quantity = $cart_item['quantity'] + $quantity;
+                $stmt = $conn->prepare("UPDATE cart SET quantity = ? WHERE id = ?");
+                $stmt->bind_param("ii", $new_quantity, $cart_item['id']);
             } else {
-                $error = "Ошибка при сохранении заказа: " . $conn->error;
+                $stmt = $conn->prepare("SELECT price FROM products WHERE id = ?");
+                $stmt->bind_param("i", $product_id);
+                $stmt->execute();
+                $product = $stmt->get_result()->fetch_assoc();
+                if ($product) {
+                    $price = $product['price'];
+                    $stmt = $conn->prepare("INSERT INTO cart (user_id, product_id, price, quantity) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("iidi", $user_id, $product_id, $price, $quantity);
+                }
             }
-            $stmt->close();
-        } else {
-            $error = "Ошибка подготовки запроса: " . $conn->error;
+            $stmt->execute();
+            header("Location: cart.php");
+            exit();
         }
-        exit();
+
+        if (isset($_POST['remove']) && isset($_POST['id'])) {
+            $cart_id = (int)$_POST['id'];
+            $stmt = $conn->prepare("DELETE FROM cart WHERE id = ? AND user_id = ?");
+            $stmt->bind_param("ii", $cart_id, $user_id);
+            $stmt->execute();
+            header("Location: cart.php");
+            exit();
+        }
+
+        if (isset($_POST['place_order'])) {
+            $fio = htmlspecialchars(trim($_POST['fio']));
+            $email = htmlspecialchars(trim($_POST['email']));
+            $card_number = htmlspecialchars(trim($_POST['card_number']));
+
+            // Подсчёт общей суммы
+            $stmt = $conn->prepare("SELECT product_id, price, quantity FROM cart WHERE user_id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $cart_items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $total = 0;
+            foreach ($cart_items as $item) {
+                $total += $item['price'] * $item['quantity'];
+            }
+
+            // Сохранение заказа
+            $stmt = $conn->prepare("INSERT INTO orders (user_id, fio, email, card_number, total, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            if ($stmt) {
+                $stmt->bind_param("issdd", $user_id, $fio, $email, $card_number, $total);
+                if ($stmt->execute()) {
+                    $stmt = $conn->prepare("DELETE FROM cart WHERE user_id = ?");
+                    $stmt->bind_param("i", $user_id);
+                    $stmt->execute();
+                    header("Location: cart.php?order=success");
+                } else {
+                    $error = "Ошибка при сохранении заказа: " . $conn->error;
+                }
+                $stmt->close();
+            } else {
+                $error = "Ошибка подготовки запроса: " . $conn->error;
+            }
+            exit();
+        }
     }
-}
 
 // Подключаем базу данных для вывода данных
 include 'includes/db.php';

@@ -2,7 +2,6 @@
 session_start();
 include 'includes/db.php';
 
-// Обработка добавления в корзину
 if (isset($_POST['add']) && isset($_POST['product_id']) && isset($_SESSION['user_id'])) {
     $product_id = (int)$_POST['product_id'];
     $quantity = 1;
@@ -95,6 +94,9 @@ $conn->close();
         <a href="index.php">Главная</a>
         <?php if (isset($_SESSION['user_id'])): ?>
             <a href="cart.php">Корзина</a>
+            <?php if ($_SESSION['is_admin']): ?>
+                <a href="admin.php">Панель модератора</a>
+            <?php endif; ?>
             <a href="profile.php">Личный кабинет</a>
             <a href="logout.php">Выход</a>
         <?php else: ?>

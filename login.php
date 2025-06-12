@@ -2,33 +2,46 @@
 session_start();
 include 'includes/db.php';
 
+ini_set('display_errors', 1); // Включение отладки
+error_reporting(E_ALL);
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login_submit'])) {
     $login = htmlspecialchars(trim($_POST['login']));
     $password = $_POST['password'];
 
-    $stmt = $conn->prepare("SELECT id, password FROM users WHERE login = ?");
+    // Отладка: вывести введённые данные
+    echo "Попытка входа: Login = '$login', Password = '$password'<br>";
+
+    $stmt = $conn->prepare("SELECT id, password, is_admin FROM users WHERE login = ?");
+    if ($stmt === false) {
+        die("Ошибка подготовки запроса: " . $conn->error);
+    }
     $stmt->bind_param("s", $login);
     $stmt->execute();
     $result = $stmt->get_result();
     $user = $result->fetch_assoc();
 
-    if ($user && password_verify($password, $user['password'])) {
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['login'] = $login;
-        if (isset($_SESSION['cart'])) {
-            foreach ($_SESSION['cart'] as $product_id => $quantity) {
-                $stmt = $conn->prepare("INSERT INTO cart (user_id, product_name, price, quantity) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE quantity = quantity + ?");
-                $product_name = "ПК " . $product_id;
-                $price = [50000, 60000, 70000][$product_id - 1] ?? 0;
-                $stmt->bind_param("issdi", $user['id'], $product_name, $price, $quantity, $quantity);
-                $stmt->execute();
+    if ($user) {
+        // Отладка: вывести данные из базы
+        echo "Найден пользователь: <pre>"; var_dump($user); echo "</pre>";
+
+        if (password_verify($password, $user['password'])) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['login'] = $login;
+            $_SESSION['is_admin'] = (bool)$user['is_admin']; // Устанавливаем роль
+
+            echo "Авторизация успешна. Роль: " . ($_SESSION['is_admin'] ? 'Администратор' : 'Пользователь') . "<br>";
+            if ($_SESSION['is_admin']) {
+                header("Location: admin.php");
+            } else {
+                header("Location: profile.php");
             }
-            unset($_SESSION['cart']);
+            exit();
+        } else {
+            $error = "<p style='color: #dc3545; text-align: center;'>Неверный пароль. Хеш в базе: " . $user['password'] . "</p>";
         }
-        header("Location: profile.php");
-        exit();
     } else {
-        $error = "<p style='color: #dc3545; text-align: center;'>Неверный логин или пароль.</p>";
+        $error = "<p style='color: #dc3545; text-align: center;'>Пользователь с логином '$login' не найден.</p>";
     }
     $stmt->close();
 }
